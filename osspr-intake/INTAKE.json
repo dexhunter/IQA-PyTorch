@@ -1,0 +1,19 @@
+[
+  {
+    "upstream_repo": "https://github.com/chaofengc/IQA-PyTorch",
+    "head_sha": "2bb31bdaf2886afc79e3f6e01127391c93b2604e",
+    "file": "pyiqa/archs/mad_arch.py",
+    "function": "get_moments",
+    "bench_cmd": "OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 .venv/bin/python osspr-intake/harness/bench.py",
+    "native_test_cmd": ".venv/bin/pytest 'tests/test_metric_general.py::test_forward[mad]' -q --tb=short",
+    "baseline_median_ms": 413.66,
+    "baseline_noise_pct": 1.31,
+    "baseline_median_runs_ms": [412.670104, 413.275513, 413.659818, 416.7403, 418.074157],
+    "noise_definition": "(max-min)/median*100 of the five baseline_median_runs_ms values",
+    "tests_pass_on_baseline": true,
+    "tests_summary": "1 passed in 2.66s",
+    "native_test_max_rss_kb": 839500,
+    "why_hot": "On one CPU MAD forward, get_moments runs 42 times (40 with sk=True) and takes 80.9% of wall time for a 1x3x384x512 pair and 81.9% for the test_forward 2x3x224x224 input.",
+    "overlap_check": "Searched chaofengc/IQA-PyTorch issues and pull requests (open and closed/merged) for get_moments, ical_stat, and ical_std: no hits. Related MAD history that does not mention get_moments: merged PR #11 (Implement MAD metric, 2022-01-28) and closed issue #99 (MAD score mismatch with IQA-optimization, discussed as an FFT difference)."
+  }
+]
