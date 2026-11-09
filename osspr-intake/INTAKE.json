@@ -1,0 +1,44 @@
+[
+  {
+    "upstream_repo": "chaofengc/IQA-PyTorch",
+    "head_sha": "7713f9bf69b5c9cb8f17e96324895dbf68d9882c",
+    "file": "pyiqa/archs/entropy_arch.py",
+    "function": "entropy",
+    "native_test_cmd": "python -m pytest -q tests/test_metric_general.py -k \"test_forward and entropy\"",
+    "bench_cmd": "python osspr-intake/harness/bench_entropy_peakmem.py",
+    "metric_kind": "peak_memory_bytes",
+    "baseline_value": 2044805120,
+    "baseline_noise_pct": 0.1923,
+    "metric_benchmark": "python osspr-intake/harness/bench_entropy_peakmem.py",
+    "labeled_data": null,
+    "tests_pass_on_baseline": true,
+    "workload": "One entropy() call on tests/test_efficiency_img_dir/frame_4wrwr48cdk6rbcjl.jpg (RGB, 864x1152, values in [0, 1]).",
+    "notes": "entropy one_hot-encodes every luma pixel into 256 int64 bins and sums them. On this photo that temporary is 864*1152*256*8 bytes and accounts for the measured high-water growth (about 2.04 GiB). bincount or histc produces the same integer histogram, so the entropy value stays the same while the buffer drops to 256 bins."
+  },
+  {
+    "upstream_repo": "chaofengc/IQA-PyTorch",
+    "head_sha": "7713f9bf69b5c9cb8f17e96324895dbf68d9882c",
+    "file": "pyiqa/archs/mad_arch.py",
+    "function": "ical_stat",
+    "native_test_cmd": "python -m pytest -q tests/test_metric_general.py -k \"test_forward and mad\"",
+    "bench_cmd": "python osspr-intake/harness/bench_ical_stat.py",
+    "baseline_median_ms": 204.8644,
+    "baseline_noise_pct": 4.959472,
+    "tests_pass_on_baseline": true,
+    "workload": "One 16x16 stride-4 moment map on a float64 Gabor magnitude band (1, 3, 864, 1152) from frame_4wrwr48cdk6rbcjl.jpg scaled by 255, as MAD lo_index consumes.",
+    "notes": "ical_stat materializes every overlapping patch and reduces it. lo_index does that 40 times per RGB pair (4 orientations x 5 scales x 2 images). Four avg_pool power sums plus the same (B, P, C) view the function already returns matched this band to 3.6e-14 / 9e-13 / 1.4e-11 on std, skew, and kurtosis and ran in about 23 ms versus about 206 ms."
+  },
+  {
+    "upstream_repo": "chaofengc/IQA-PyTorch",
+    "head_sha": "7713f9bf69b5c9cb8f17e96324895dbf68d9882c",
+    "file": "pyiqa/archs/mad_arch.py",
+    "function": "gaborconvolve",
+    "native_test_cmd": "python -m pytest -q tests/test_metric_general.py -k \"test_forward and mad\"",
+    "bench_cmd": "python osspr-intake/harness/bench_gaborconvolve.py",
+    "baseline_median_ms": 921.8788,
+    "baseline_noise_pct": 4.834207,
+    "tests_pass_on_baseline": true,
+    "workload": "One 4-orientation by 5-scale log-Gabor bank on frame_4wrwr48cdk6rbcjl.jpg scaled to 0-255 (1, 3, 864, 1152), the tensor MAD passes into lo_index.",
+    "notes": "gaborconvolve rebuilds the filter bank in numpy float64, runs twenty sequential ifft2 calls, and stacks real/imag copies. A vectorized torch filter bank, one batched ifft2, and view_as_real matched every response within 2e-14 and cut a call on this photo from about 0.86 s to about 0.55 s. lo_index runs the bank on both images."
+  }
+]
