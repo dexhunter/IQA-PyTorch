@@ -381,20 +381,58 @@ def lo_index(ref, dst):
         torch.Tensor: Per-channel low-frequency distortion scores, shaped
         ``(B, C)``.
     """
-    gabRef = gaborconvolve(ref)
-    gabDst = gaborconvolve(dst)
     s = [0.5 / 13.25, 0.75 / 13.25, 1 / 13.25, 5 / 13.25, 6 / 13.25]
 
-    mp = 0
-    for gb_i in range(4):
-        for gb_j in range(5):
-            stdref, skwref, krtref = ical_stat(math_util.abs(gabRef[gb_i][gb_j]))
-            stddst, skwdst, krtdst = ical_stat(math_util.abs(gabDst[gb_i][gb_j]))
-            mp = mp + s[gb_i] * (
+    def strip_stats(mag, p=16, stride=4, strip=8):
+        # Patches only overlap within p - stride rows, so take the statistics
+        # over horizontal strips of `strip` patch rows and join them; this keeps
+        # the patch temporaries of ical_stat small. The last strip takes the
+        # remaining rows, so small images fail in ical_stat as before.
+        n_rows = (mag.shape[2] - (p - stride)) // stride
+        parts = []
+        for r0 in range(0, max(n_rows, 1), strip):
+            r1 = r0 + strip
+            rows = slice(stride * r0, stride * r1 + p - stride if r1 < n_rows else None)
+            parts.append(ical_stat(mag[:, :, rows], p, stride))
+        return tuple(torch.cat(maps, dim=2) for maps in zip(*parts))
+
+    def plane_stats(plane):
+        # Build the Gabor bank of one image plane and yield the statistic maps
+        # of each response in turn, dropping the response as soon as it is used.
+        bank = gaborconvolve(plane)
+        responses = [r for row in bank for r in row]
+        del bank
+        for idx in range(20):
+            magnitude = math_util.abs(responses[idx])
+            responses[idx] = None
+            yield strip_stats(magnitude)
+            del magnitude
+
+    # The filters act on each image plane independently: fold one plane pair
+    # at a time into its distortion map, so only one bank and one plane of
+    # reference statistics are live at once.
+    B, C, H, W = ref.shape
+    ref_planes = ref.reshape(B * C, 1, H, W)
+    dst_planes = dst.reshape(B * C, 1, H, W)
+    plane_maps = []
+    for k in range(B * C):
+        ref_stats = list(plane_stats(ref_planes[k : k + 1]))
+        mp = 0
+        for idx, (stddst, skwdst, krtdst) in enumerate(plane_stats(dst_planes[k : k + 1])):
+            stdref, skwref, krtref = ref_stats[idx]
+            ref_stats[idx] = None
+            mp = mp + s[idx // 5] * (
                 torch.abs(stdref - stddst)
                 + 2 * torch.abs(skwref - skwdst)
                 + torch.abs(krtref - krtdst)
             )
+        plane_maps.append(mp)
+
+    # ical_stat lays out its (B, C, rows, cols) maps from patch-major
+    # (B, P, C) memory order; rebuild that order from the per-plane maps.
+    rows, cols = plane_maps[0].shape[2:]
+    flat = torch.stack([m.reshape(-1) for m in plane_maps]).reshape(B, C, -1)
+    mp = flat.transpose(1, 2).reshape(B, C, rows, cols)
 
     B, C, rows, cols = mp.shape
     return torch.norm(mp.reshape(B, C, -1), dim=2) / np.sqrt(rows * cols)
