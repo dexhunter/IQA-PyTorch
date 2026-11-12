@@ -1,0 +1,67 @@
+[
+  {
+    "upstream_repo": "chaofengc/IQA-PyTorch",
+    "head_sha": "2cd388c92ccb6f72eeddad07cbb1503a99a7ffbb",
+    "file": "pyiqa/archs/niqe_arch.py",
+    "function": "ilniqe",
+    "native_test_cmd": "pytest tests/test_metric_general.py::test_forward[ilniqe]",
+    "bench_cmd": "python osspr-intake/harness/bench_ilniqe.py --seed 0 --runs 7 --warmup 4",
+    "tests_pass_on_baseline": true,
+    "baseline_median_ms": 3268.98,
+    "baseline_noise_pct": 9.87,
+    "workload": "One IL-NIQE score of the 1075x964 photo tests/test_efficiency_img_dir/frame_9ogwhvvy7gfj6jzh.jpg.",
+    "notes": "ilniqe builds 11x11 Gaussian-derivative kernels and applies each with a full 2D conv2d; a 1075x964 photo does that 100 times and those convs are about 2.1s of the call. The kernels are exactly rank-1 (one singular value), so the same zero same-padding followed by two valid 1D convolutions is a local change. A prototype of that, not committed, matched the IL-NIQE score within 6.8e-14 absolute and, on this photo with 4 torch threads, moved a paired timing from about 2970 ms to 1170 ms (about 1.7s saved per call). Noise is (max-min)/median*100 over the 7 timed runs after 4 warmup calls. That spread is 9.87% (about 320 ms) and does not reach the prototype, whose runs stayed near 1.1-1.3s. Overlap: no open upstream PR, and no open issue names ilniqe. Issue #234 asks for review of a caller's own NIQE snippet; issue #190 asks about MPS placement in other files. No dexhunter PR touches niqe_arch.py. Commit 26d2910 sped up IL-NIQE earlier and left these 2D derivative convolutions in place. Merges #318, #319, and #320 changed mad ical_stat, entropy, and fsim _phase_congruency, not this function."
+  },
+  {
+    "upstream_repo": "chaofengc/IQA-PyTorch",
+    "head_sha": "2cd388c92ccb6f72eeddad07cbb1503a99a7ffbb",
+    "file": "pyiqa/archs/mad_arch.py",
+    "function": "gaborconvolve",
+    "native_test_cmd": "pytest tests/test_metric_general.py::test_forward[mad]",
+    "bench_cmd": "python osspr-intake/harness/bench_gaborconvolve.py --seed 0 --runs 7 --warmup 4",
+    "tests_pass_on_baseline": true,
+    "baseline_median_ms": 1207.60,
+    "baseline_noise_pct": 13.10,
+    "workload": "One log-Gabor filter-bank call on that 1075x964 photo scaled to 0-255, which is what MAD.mad does before the low-frequency index.",
+    "notes": "gaborconvolve rebuilds a 5-scale by 4-orientation log-Gabor bank in NumPy on every call and runs 20 separate ifft2s. Building the bank in torch and applying it with one batched ifft2 is a local change. An uncommitted prototype matched filter responses within 1.66e-5 absolute and changed a 512px MAD score from 23.2038 to 23.2041. Paired timing on the harness photo with 4 torch threads was about 1150 ms versus 542 ms, roughly 600 ms saved per call, and MAD calls this twice. Noise is (max-min)/median*100 over 7 runs after 4 warmups: 13.10%, a spread of about 160 ms around the 1207.60 ms median, several times smaller than the prototype gap. Overlap: no open PR or issue on gaborconvolve or mad_arch.py. Issue #254 is an old torch.rfft report against a different package's FSIM, not this function. dexhunter PRs #314 and #318 changed get_moments and ical_stat in this file and did not edit gaborconvolve. Merges #319 and #320 changed entropy and fsim _phase_congruency."
+  },
+  {
+    "upstream_repo": "chaofengc/IQA-PyTorch",
+    "head_sha": "2cd388c92ccb6f72eeddad07cbb1503a99a7ffbb",
+    "file": "pyiqa/archs/nrqm_arch.py",
+    "function": "norm_sender_normalized",
+    "native_test_cmd": "pytest tests/test_metric_general.py::test_forward[nrqm]",
+    "bench_cmd": "python osspr-intake/harness/bench_norm_sender.py --seed 0 --runs 7 --warmup 2",
+    "tests_pass_on_baseline": true,
+    "baseline_median_ms": 1278.39,
+    "baseline_noise_pct": 3.75,
+    "workload": "One NRQM global-GSM neighborhood normalization of the 2-scale, 6-orientation steerable pyramid of that photo's luminance.",
+    "notes": "For each of 12 subbands the code appends the other orientations with a separate cat, recopying the full-resolution neighborhood every time. Stacking the six same-scale bands and concatenating those columns once is a local change. An uncommitted prototype was bit-exact (max abs diff 0 on every subband) and moved a paired timing from about 1288 ms to 955 ms, about 333 ms saved per call. Noise is (max-min)/median*100 over 7 runs after 2 warmups with 4 torch threads, 3.75% (about 48 ms), well under the measured gap. Overlap: no open PR, and no open issue names this function. Issue #262 asks which datasets trained NR-IQA metrics. dexhunter PR #315 changed gamma_gen_gauss in this same file, not norm_sender_normalized. Merges #318, #319, and #320 did not touch nrqm_arch.py."
+  },
+  {
+    "upstream_repo": "chaofengc/IQA-PyTorch",
+    "head_sha": "2cd388c92ccb6f72eeddad07cbb1503a99a7ffbb",
+    "file": "pyiqa/archs/vif_arch.py",
+    "function": "VIF.vifsub_est_M",
+    "native_test_cmd": "pytest tests/test_metric_general.py::test_forward[vif]",
+    "bench_cmd": "python osspr-intake/harness/bench_vifsub_est_m.py --seed 0 --runs 7 --warmup 4",
+    "tests_pass_on_baseline": true,
+    "baseline_median_ms": 247.72,
+    "baseline_noise_pct": 2.79,
+    "workload": "One VIF subband gain and noise estimate on the steerable pyramids of that 1075x964 photo and a deterministic darker copy.",
+    "notes": "vifsub_est_M slides flat boxes (3 to 17 pixels) with a dense conv2d for every subband moment. Those sums are prefix sums, so an integral image is a local replacement for corrDn_win. An uncommitted prototype kept the full VIF score within about 1e-6 (1.09653389 versus 1.09653294 on this pair) and moved a paired vifsub_est_M timing from about 224 ms to 60 ms, about 164 ms saved per call. Noise on the harness is (max-min)/median*100 over 7 runs after 4 warmups with 4 torch threads: 2.79%, about 7 ms around the 247.72 ms median. Overlap: no open PR and no dexhunter PR touches vif_arch.py. Issue #190 asks about MPS device placement and does not name VIF. Merges #318, #319, and #320 did not touch this file."
+  },
+  {
+    "upstream_repo": "chaofengc/IQA-PyTorch",
+    "head_sha": "2cd388c92ccb6f72eeddad07cbb1503a99a7ffbb",
+    "file": "pyiqa/archs/func_util.py",
+    "function": "estimate_aggd_param",
+    "native_test_cmd": "pytest tests/test_metric_general.py::test_forward[brisque]",
+    "bench_cmd": "python osspr-intake/harness/bench_estimate_aggd_param.py --seed 0 --runs 7 --warmup 2",
+    "tests_pass_on_baseline": true,
+    "baseline_median_ms": 186.89,
+    "baseline_noise_pct": 3.33,
+    "workload": "One AGGD fit on 2808 blocks of 84x84, the IL-NIQE log-Gabor channel batch for its 524px working image (36 blocks times 78 channels).",
+    "notes": "estimate_aggd_param rebuilds a 9801-entry gamma table and broadcasts it across the batch for abs().argmin. On this IL-NIQE-sized batch that broadcast is about 105 MiB ((2808, 9801) float32). A searchsorted nearest lookup on the sorted table is a local change. An uncommitted prototype was bit-exact (max abs diff 0) and moved a paired timing from about 190 ms to 127 ms, about 63 ms saved per call, and it drops that broadcast. Noise is (max-min)/median*100 over 7 runs after 2 warmups with 4 torch threads and seed 0: 3.33%, about 6 ms around the 186.89 ms median. BRISQUE, NIQE, and IL-NIQE all call this function; the large call is the IL-NIQE block batch. Overlap: no open PR and no dexhunter PR touches func_util.py. Issue #234 is a caller's NIQE usage question, not this function. PR #315 changed gamma_gen_gauss in nrqm_arch.py, a different lookup. Merges #318, #319, and #320 did not touch this file."
+  }
+]
